@@ -2160,4 +2160,62 @@ TEST_CASE(reorder_slice_ins_deps)
     EXPECT(m == create_module());
 }
 
+TEST_CASE(remove_convert)
+{
+    auto create_module = [] {
+        migraphx::module m;
+        migraphx::shape sx{migraphx::shape::float_type, {4, 2}};
+        migraphx::shape sy{migraphx::shape::float_type, {2, 2}};
+        auto inx                 = m.add_parameter("x", sx);
+        auto iny                 = m.add_parameter("y", sx);
+
+        auto sum = m.add_instruction(migraphx::make_op("add"), inx, iny);
+        auto c1 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), sum);
+        auto c2 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), c1);
+        auto c3 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), c2);
+        m.add_return({c3});
+
+        return m;
+    };
+
+    auto create_opt_module = [] {
+        migraphx::module m;
+        migraphx::shape sx{migraphx::shape::float_type, {4, 2}};
+        migraphx::shape sy{migraphx::shape::float_type, {2, 2}};
+        auto inx                 = m.add_parameter("x", sx);
+        auto iny                 = m.add_parameter("y", sx);
+
+        auto sum = m.add_instruction(migraphx::make_op("add"), inx, iny);
+        m.add_return({sum});
+
+        return m;
+    };
+
+    auto m = create_module();
+    run_pass(m);
+    EXPECT(m == create_opt_module());
+}
+
+TEST_CASE(remove_convert_not)
+{
+    auto create_module = [] {
+        migraphx::module m;
+        migraphx::shape sx{migraphx::shape::float_type, {4, 2}};
+        migraphx::shape sy{migraphx::shape::float_type, {2, 2}};
+        auto inx                 = m.add_parameter("x", sx);
+        auto iny                 = m.add_parameter("y", sx);
+
+        auto sum = m.add_instruction(migraphx::make_op("add"), inx, iny);
+        auto c2 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), sum);
+        auto c3 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::int32_type}}), c2);
+        m.add_return({c3});
+
+        return m;
+    };
+
+    auto m = create_module();
+    run_pass(m);
+    EXPECT(m == create_module());
+}
+
 int main(int argc, const char* argv[]) { test::run(argc, argv); }

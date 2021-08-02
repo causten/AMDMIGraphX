@@ -16,6 +16,7 @@
 #include <migraphx/serialize.hpp>
 
 #include "migraphx/shape.hpp"
+#include "migraphx/simplify_algebra.hpp"
 #include "test.hpp"
 #include <migraphx/half.hpp>
 
@@ -369,11 +370,7 @@ TEST_CASE(fp16_subgraph)
         auto mhl2 = then_mod->add_instruction(
             migraphx::make_op("multibroadcast", {{"output_lens", {3, 4}}}), hl2);
         auto mu      = then_mod->add_instruction(migraphx::make_op("mul"), hy, mhl2);
-        auto mu_fp32 = then_mod->add_instruction(
-            migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), mu);
-        auto mu_fp16 = then_mod->add_instruction(
-            migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), mu_fp32);
-        then_mod->add_return({ad, mu, mu_fp16});
+        then_mod->add_return({ad, mu, mu});
 
         auto* else_mod = p.create_module("If_6_else");
         auto mhl3      = else_mod->add_instruction(
@@ -382,11 +379,7 @@ TEST_CASE(fp16_subgraph)
         auto mhl4 = else_mod->add_instruction(
             migraphx::make_op("multibroadcast", {{"output_lens", {3, 4}}}), hl3);
         auto ad1     = else_mod->add_instruction(migraphx::make_op("add"), hy, mhl4);
-        auto ad_fp32 = else_mod->add_instruction(
-            migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), ad1);
-        auto ad_fp16 = else_mod->add_instruction(
-            migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), ad_fp32);
-        else_mod->add_return({mu1, ad1, ad_fp16});
+        else_mod->add_return({mu1, ad1, ad1});
 
         auto iff = mm->add_instruction(migraphx::make_op("if"), {cond}, {then_mod, else_mod});
         auto hr0 = mm->add_instruction(migraphx::make_op("get_tuple_elem", {{"index", 0}}), iff);
@@ -396,8 +389,6 @@ TEST_CASE(fp16_subgraph)
         auto r1  = mm->add_instruction(
             migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), hr1);
         auto r2 = mm->add_instruction(migraphx::make_op("get_tuple_elem", {{"index", 2}}), iff);
-        r2      = mm->add_instruction(
-            migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), r2);
         mm->add_return({r0, r1, r2});
 
         return p;
@@ -405,7 +396,7 @@ TEST_CASE(fp16_subgraph)
 
     auto p1 = create_program();
     migraphx::quantize_fp16(p1);
-    migraphx::run_passes(p1, {migraphx::dead_code_elimination{}});
+    migraphx::run_passes(p1, {migraphx::dead_code_elimination{}, migraphx::simplify_algebra{}});
 
     auto p2 = create_fp16_program();
 
