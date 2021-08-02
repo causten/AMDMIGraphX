@@ -369,7 +369,7 @@ TEST_CASE(fp16_subgraph)
         auto ad   = then_mod->add_instruction(migraphx::make_op("add"), hx, mhl1);
         auto mhl2 = then_mod->add_instruction(
             migraphx::make_op("multibroadcast", {{"output_lens", {3, 4}}}), hl2);
-        auto mu      = then_mod->add_instruction(migraphx::make_op("mul"), hy, mhl2);
+        auto mu = then_mod->add_instruction(migraphx::make_op("mul"), hy, mhl2);
         then_mod->add_return({ad, mu, mu});
 
         auto* else_mod = p.create_module("If_6_else");
@@ -378,7 +378,7 @@ TEST_CASE(fp16_subgraph)
         auto mu1  = else_mod->add_instruction(migraphx::make_op("mul"), hx, mhl3);
         auto mhl4 = else_mod->add_instruction(
             migraphx::make_op("multibroadcast", {{"output_lens", {3, 4}}}), hl3);
-        auto ad1     = else_mod->add_instruction(migraphx::make_op("add"), hy, mhl4);
+        auto ad1 = else_mod->add_instruction(migraphx::make_op("add"), hy, mhl4);
         else_mod->add_return({mu1, ad1, ad1});
 
         auto iff = mm->add_instruction(migraphx::make_op("if"), {cond}, {then_mod, else_mod});

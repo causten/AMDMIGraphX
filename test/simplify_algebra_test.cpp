@@ -2166,13 +2166,16 @@ TEST_CASE(remove_convert)
         migraphx::module m;
         migraphx::shape sx{migraphx::shape::float_type, {4, 2}};
         migraphx::shape sy{migraphx::shape::float_type, {2, 2}};
-        auto inx                 = m.add_parameter("x", sx);
-        auto iny                 = m.add_parameter("y", sx);
+        auto inx = m.add_parameter("x", sx);
+        auto iny = m.add_parameter("y", sx);
 
         auto sum = m.add_instruction(migraphx::make_op("add"), inx, iny);
-        auto c1 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), sum);
-        auto c2 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), c1);
-        auto c3 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), c2);
+        auto c1  = m.add_instruction(
+            migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), sum);
+        auto c2 = m.add_instruction(
+            migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), c1);
+        auto c3 = m.add_instruction(
+            migraphx::make_op("convert", {{"target_type", migraphx::shape::float_type}}), c2);
         m.add_return({c3});
 
         return m;
@@ -2182,8 +2185,8 @@ TEST_CASE(remove_convert)
         migraphx::module m;
         migraphx::shape sx{migraphx::shape::float_type, {4, 2}};
         migraphx::shape sy{migraphx::shape::float_type, {2, 2}};
-        auto inx                 = m.add_parameter("x", sx);
-        auto iny                 = m.add_parameter("y", sx);
+        auto inx = m.add_parameter("x", sx);
+        auto iny = m.add_parameter("y", sx);
 
         auto sum = m.add_instruction(migraphx::make_op("add"), inx, iny);
         m.add_return({sum});
@@ -2202,12 +2205,14 @@ TEST_CASE(remove_convert_not)
         migraphx::module m;
         migraphx::shape sx{migraphx::shape::float_type, {4, 2}};
         migraphx::shape sy{migraphx::shape::float_type, {2, 2}};
-        auto inx                 = m.add_parameter("x", sx);
-        auto iny                 = m.add_parameter("y", sx);
+        auto inx = m.add_parameter("x", sx);
+        auto iny = m.add_parameter("y", sx);
 
         auto sum = m.add_instruction(migraphx::make_op("add"), inx, iny);
-        auto c2 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), sum);
-        auto c3 = m.add_instruction(migraphx::make_op("convert", {{"target_type", migraphx::shape::int32_type}}), c2);
+        auto c2  = m.add_instruction(
+            migraphx::make_op("convert", {{"target_type", migraphx::shape::half_type}}), sum);
+        auto c3 = m.add_instruction(
+            migraphx::make_op("convert", {{"target_type", migraphx::shape::int32_type}}), c2);
         m.add_return({c3});
 
         return m;

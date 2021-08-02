@@ -1014,19 +1014,16 @@ struct find_split_transpose
 
 struct find_convert
 {
-    auto matcher() const
-    {
-        return match::name("convert").bind("trans");
-    }
+    auto matcher() const { return match::name("convert").bind("trans"); }
 
     void apply(module& m, match::matcher_result r) const
     {
         auto ins = r.result;
 
         // remove convert operator whose input and output data types are the same
-        auto in_shape = ins->inputs().front()->get_shape();
+        auto in_shape  = ins->inputs().front()->get_shape();
         auto out_shape = ins->get_shape();
-        if (in_shape.type() == out_shape.type())
+        if(in_shape.type() == out_shape.type())
         {
             m.replace_instruction(ins, ins->inputs().front());
         }
@@ -1034,10 +1031,10 @@ struct find_convert
         // if two consecutive converts do opposite conversion, then they both
         // can be removed
         auto input = ins->inputs().front();
-        if (input->name() == "convert")
+        if(input->name() == "convert")
         {
             auto in_in = input->inputs().front();
-            if (out_shape.type() == in_in->get_shape().type())
+            if(out_shape.type() == in_in->get_shape().type())
             {
                 m.replace_instruction(ins, in_in);
             }
