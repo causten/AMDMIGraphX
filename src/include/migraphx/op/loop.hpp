@@ -135,6 +135,7 @@ struct loop
             auto mod_args = run(mod, params);
             // copy loop carried dependency from mod outputs to inputs
             std::copy(mod_args.begin(), mod_args.begin() + dep_num + 1, in_args.begin() + 1);
+            // std::copy(mod_args.begin(), mod_args.begin() + dep_num + 1, out_args.begin());
             cond = mod_args.at(0).at<bool>();
 
             // concat scan outputs
@@ -151,12 +152,10 @@ struct loop
             }
         }
 
-        // copy loop carried dependency to final output
-        std::vector<argument> outputs(in_args.begin() + 2, in_args.end());
-        // append scan outputs
-        outputs.insert(outputs.end(), scan_outputs.begin(), scan_outputs.end());
+        out_args.erase(out_args.begin());
+        std::copy(in_args.begin() + 2, in_args.end(), out_args.begin());
 
-        return argument{outputs};
+        return argument{out_args};
     }
 };
 

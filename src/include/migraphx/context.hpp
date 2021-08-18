@@ -7,6 +7,7 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <iostream>
 #include <migraphx/config.hpp>
 #include <migraphx/value.hpp>
 
@@ -132,6 +133,9 @@ struct context
 
     friend bool is_shared(const context& private_detail_x, const context& private_detail_y)
     {
+        std::cout << "ptr1 = " << private_detail_x.private_detail_te_handle_mem_var << std::endl;
+        std::cout << "ptr2 = " << private_detail_y.private_detail_te_handle_mem_var << std::endl;
+
         return private_detail_x.private_detail_te_handle_mem_var ==
                private_detail_y.private_detail_te_handle_mem_var;
     }

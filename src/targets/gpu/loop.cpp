@@ -36,8 +36,7 @@ static std::pair<int, bool> get_name_index(const std::string& name, const std::s
 }
 
 argument
-hip_loop::compute(context& ctx,
-                  const shape&,
+hip_loop::compute(context& ctx, const shape&,
                   const std::vector<argument>& args,
                   const std::vector<module_ref>& mods,
                   const std::function<std::vector<argument>(
@@ -98,15 +97,16 @@ hip_loop::compute(context& ctx,
         }
 
         auto mod_args = run(mod, params);
-        ctx.finish();
+        gpu_sync();
 
         // copy back cond to be used next iteration
         (void)hipMemcpy(&cond, mod_args.at(0).data(), sizeof(bool), hipMemcpyDeviceToHost);
         std::copy(mod_args.begin(), mod_args.begin() + dep_num + 1, in_args.begin() + 1);
-        std::copy(mod_args.begin(), mod_args.begin() + dep_num + 1, out_args.begin());
+        // std::copy(mod_args.begin(), mod_args.begin() + dep_num + 1, out_args.begin());
     }
 
     out_args.erase(out_args.begin());
+    std::copy(in_args.begin() + 2, in_args.end(), out_args.begin());
     std::vector<argument> scan_outputs(out_args.begin() + dep_num, out_args.end());
 
     // set unused scan outputs to 0s
