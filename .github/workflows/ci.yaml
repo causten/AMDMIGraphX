@@ -108,10 +108,6 @@ jobs:
       run: |
         mkdir build
         cd build
-      shell: bash -c "docker run -i -v=$GITHUB_WORKSPACE:/data -w /data migraphx bash < {0}"
-      run: |
-        mkdir build
-        cd build
         CXX=/opt/rocm/llvm/bin/clang++ CC=/opt/rocm/llvm/bin/clang cmake \
           -DCPPCHECK_BUILD_DIR=/data/cppcheck-cache \
           -DROCM_ENABLE_GH_ANNOTATIONS=On \
