@@ -15,7 +15,11 @@ jobs:
 
     steps:
     - name: Print Free space
-      run: df -h
+      run: |
+              df -h
+              echo ${{ github }}
+              echo $(nproc)
+              echo ${{ (nproc) }} 
 
     - name: Free space
       run: sudo rm -rf /usr/local/android /usr/share/dotnet /usr/local/share/boost /opt/ghc /usr/local/share/chrom* /usr/share/swift /usr/local/julia*
