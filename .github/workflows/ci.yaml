@@ -18,8 +18,8 @@ jobs:
       run: |
               df -h
               echo ${{ github }}
-              echo $(nproc)
-              echo ${{ (nproc) }} 
+              cpuinfo
+              nproc
 
     - name: Free space
       run: sudo rm -rf /usr/local/android /usr/share/dotnet /usr/local/share/boost /opt/ghc /usr/local/share/chrom* /usr/share/swift /usr/local/julia*
@@ -104,6 +104,10 @@ jobs:
       run: docker build . --file hip-clang.docker --tag migraphx
 
     - name: Cppcheck
+      shell: bash -c "docker run -i -v=$GITHUB_WORKSPACE:/data -w /data migraphx bash < {0}"
+      run: |
+        mkdir build
+        cd build
       shell: bash -c "docker run -i -v=$GITHUB_WORKSPACE:/data -w /data migraphx bash < {0}"
       run: |
         mkdir build
@@ -260,7 +264,3 @@ jobs:
         lcov --directory . --capture --output-file $(pwd)/coverage.info
         lcov --remove $(pwd)/coverage.info '/usr/*' --output-file $(pwd)/coverage.info
         lcov --list $(pwd)/coverage.info
-        curl -s https://codecov.io/bash | bash
-        echo "Uploaded"
-
-
