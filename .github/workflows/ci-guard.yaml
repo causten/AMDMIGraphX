@@ -1,0 +1,28 @@
+name: CI File Change Warning
+
+on:
+  pull_request:
+    paths:
+      - '.github/**'
+
+jobs:
+  warn:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Post warning comment
+        uses: marocchino/sticky-pull-request-comment@v2.9.0
+        with:
+          header: ci-guard
+          message: |
+            > [!WARNING]
+            > **CI/Automation Change Detected**
+            >
+            > This PR modifies files under `.github/`. Changes here can break builds, disable security checks, or disrupt automation for every contributor.
+            >
+            > Please review these files with extra caution:
+            > - Are all Actions pinned to specific versions?
+            > - Are secrets referenced securely?
+            > - Are `if` conditions correct and fail-safe?
+            > - Are permission/token scopes minimal and justified?
