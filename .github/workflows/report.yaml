@@ -75,7 +75,7 @@ jobs:
         with:
           repository: ROCm/migraphx-benchmark-utils
           path: benchmark-utils
-          token: ${{ secrets.MIGRAPHX_BOT_TOKEN }}
+          token: ${{ secrets.NASTY_TOKEN }}
 
       - name: Setup Python
         if: steps.dl_art.outcome == 'success'
