@@ -1,8 +1,4 @@
----
-applyTo: ".github/**"
----
-
-## Mandatory warning banner
+## Mandatory warning banner for `.github/` changes
 
 When any file under `.github/` is changed, the **very first line** of the review summary MUST be a blockquote warning banner using this exact format:
 
