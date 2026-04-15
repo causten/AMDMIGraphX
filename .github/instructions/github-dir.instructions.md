@@ -1,13 +1,15 @@
-## Mandatory warning banner for `.github/` changes
+---
+applyTo: ".github/**"
+---
 
-When any file under `.github/` is changed, the **very first line** of the review summary MUST be a blockquote warning banner using this exact format:
+The very first thing in your review summary, before any heading or overview, MUST be this exact blockquote:
 
 > [!WARNING]
 > This PR modifies CI/automation files under `.github/`. Changes here can break builds, disable security checks, or disrupt automation for every contributor. Review these files with extra caution.
 
-This banner must appear before the pull request overview or any other content. Do not omit it, do not embed it inside a paragraph, and do not rephrase it as a casual note.
+Do not skip this blockquote. Do not rephrase it. Do not embed it inside a paragraph.
 
-## Review checklist for `.github/` changes
+## Review checklist
 
 - Verify that all GitHub Actions use pinned versions (e.g. `actions/checkout@v6`), never `@main` or `@master`.
 - Check that secrets are not exposed or referenced insecurely.
