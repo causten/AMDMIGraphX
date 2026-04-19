@@ -107,20 +107,14 @@ jobs:
       - name: Add ROCm repository (RPM)
         if: matrix.pkg_format == 'RPM'
         run: |
+          # Follows the official ROCm RHEL native install instructions:
+          # https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/install-methods/package-manager/package-manager-rhel.html
           tee /etc/yum.repos.d/rocm.repo <<REPOEOF
-          [ROCm]
-          name=ROCm
-          baseurl=https://repo.radeon.com/rocm/rhel8/${{ env.ROCM_VERSION }}/main
+          [rocm]
+          name=ROCm ${{ env.ROCM_VERSION }} repository
+          baseurl=https://repo.radeon.com/rocm/el8/${{ env.ROCM_VERSION }}/main
           enabled=1
-          gpgcheck=1
-          gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
-          REPOEOF
-
-          tee /etc/yum.repos.d/amdgpu.repo <<REPOEOF
-          [amdgpu]
-          name=amdgpu
-          baseurl=https://repo.radeon.com/amdgpu/${{ env.ROCM_VERSION }}/rhel/8.10/main/x86_64
-          enabled=1
+          priority=50
           gpgcheck=1
           gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
           REPOEOF
@@ -131,7 +125,7 @@ jobs:
         if: matrix.pkg_format == 'RPM'
         run: |
           dnf install -y \
-            rocm-dev \
+            rocm-hip-sdk \
             rocm-cmake \
             miopen-hip-devel \
             rocblas-devel \
@@ -235,15 +229,20 @@ jobs:
       - name: Install Python build helpers (DEB)
         if: matrix.pkg_format == 'DEB'
         run: |
-          python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
-          python3 -m pip install --break-system-packages pybind11[global] numpy
-          echo "PYTHON3_EXECUTABLE=$(command -v python3)" >> "$GITHUB_ENV"
-          echo "Using primary Python: $(python3 --version)"
+          # Use an isolated venv so we don't fight PEP 668 / dpkg-installed pip
+          # (Ubuntu's system pip lacks a RECORD file and can't be upgraded in place).
+          python3 -m venv --system-site-packages /opt/migraphx-venv
+          /opt/migraphx-venv/bin/pip install --upgrade pip setuptools wheel
+          /opt/migraphx-venv/bin/pip install pybind11[global] numpy
+
+          echo "/opt/migraphx-venv/bin" >> "$GITHUB_PATH"
+          echo "PYTHON3_EXECUTABLE=/opt/migraphx-venv/bin/python" >> "$GITHUB_ENV"
+          echo "Using primary Python: $(/opt/migraphx-venv/bin/python --version)"
 
       # -------- Common steps --------
 
       - name: Install rbuild
-        run: python3 -m pip install ${{ matrix.pkg_format == 'DEB' && '--break-system-packages' || '' }} rbuild cget
+        run: python3 -m pip install rbuild cget
 
       - name: Checkout MIGraphX
         uses: actions/checkout@v4
