@@ -88,12 +88,15 @@ jobs:
         run: |
           dnf install -y epel-release
           dnf install -y \
-            cmake \
             git \
             wget \
             which \
             pkg-config \
             rpm-build \
+            gcc-c++ \
+            libstdc++-devel \
+            clang-tools-extra \
+            cppcheck \
             numactl-devel \
             sqlite-devel \
             openssl-devel \
@@ -169,7 +172,9 @@ jobs:
             lsb-release \
             sudo \
             build-essential \
-            cmake \
+            clang-format \
+            clang-tidy \
+            cppcheck \
             git \
             pkg-config \
             libnuma-dev \
@@ -226,6 +231,33 @@ jobs:
             composablekernel-dev \
             half
 
+      - name: Install Python dev packages (DEB, default OS python through 3.14)
+        if: matrix.pkg_format == 'DEB'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          # The system default python3 is already installed by the base deps step.
+          # Use the deadsnakes PPA to install any newer minor versions up to 3.14
+          # so MIGraphX can build Python bindings for every supported interpreter.
+          apt-get install -y --no-install-recommends software-properties-common
+          add-apt-repository -y ppa:deadsnakes/ppa
+          apt-get update
+
+          default_minor=$(python3 -c 'import sys; print(sys.version_info.minor)')
+          echo "System default Python: 3.${default_minor}"
+
+          installed=()
+          for minor in $(seq "${default_minor}" 14); do
+            pkgs="python3.${minor} python3.${minor}-dev python3.${minor}-venv"
+            if apt-get install -y --no-install-recommends ${pkgs}; then
+              installed+=("3.${minor}")
+            else
+              echo "::warning::python3.${minor} dev packages unavailable for this Ubuntu release"
+            fi
+          done
+
+          echo "Installed Python dev packages for: ${installed[*]}"
+
       - name: Install Python build helpers (DEB)
         if: matrix.pkg_format == 'DEB'
         run: |
@@ -241,8 +273,13 @@ jobs:
 
       # -------- Common steps --------
 
-      - name: Install rbuild
-        run: python3 -m pip install https://github.com/RadeonOpenCompute/rbuild/archive/master.tar.gz cget
+      - name: Install cmake 3.28.4 and rbuild
+        run: |
+          python3 -m pip install \
+            cmake==3.28.4 \
+            https://github.com/RadeonOpenCompute/rbuild/archive/master.tar.gz \
+            cget
+          echo "Using cmake: $(cmake --version | head -n1)"
 
       - name: Checkout MIGraphX
         uses: actions/checkout@v4
@@ -270,6 +307,7 @@ jobs:
             -DMIGRAPHX_ENABLE_PYTHON=ON \
             -DMIGRAPHX_DISABLE_VIRTUAL_ENV=ON \
             -DMIGRAPHX_USE_COMPOSABLEKERNEL=ON \
+            -DPython_EXECUTABLE="${PYTHON3_EXECUTABLE}" \
             -DPython3_EXECUTABLE="${PYTHON3_EXECUTABLE}"
 
       - name: Build MIGraphX
