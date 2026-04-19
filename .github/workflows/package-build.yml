@@ -242,7 +242,7 @@ jobs:
       # -------- Common steps --------
 
       - name: Install rbuild
-        run: python3 -m pip install rbuild cget
+        run: python3 -m pip install https://github.com/RadeonOpenCompute/rbuild/archive/master.tar.gz cget
 
       - name: Checkout MIGraphX
         uses: actions/checkout@v4
