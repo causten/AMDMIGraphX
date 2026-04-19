@@ -153,6 +153,10 @@ jobs:
           PRIMARY="/opt/python/${{ env.PRIMARY_PYTHON_VERSION }}"
           echo "PATH=${PRIMARY}/bin:${PATH}" >> "$GITHUB_ENV"
           echo "PYTHON3_EXECUTABLE=${PRIMARY}/bin/python" >> "$GITHUB_ENV"
+          # Hint cmake's FindPython / FindPython3 so dep builds spawned by
+          # rbuild/cget can locate libpython and the headers under /opt/python.
+          echo "Python_ROOT_DIR=${PRIMARY}" >> "$GITHUB_ENV"
+          echo "Python3_ROOT_DIR=${PRIMARY}" >> "$GITHUB_ENV"
           echo "Using primary Python: $("$PRIMARY/bin/python" --version)"
 
       # -------- DEB (Ubuntu 24.04 noble) setup --------
