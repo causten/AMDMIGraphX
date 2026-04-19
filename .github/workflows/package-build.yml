@@ -14,9 +14,9 @@ on:
     inputs:
       rocm_release:
         type: string
-        description: ROCm release version (e.g., 6.4)
+        description: ROCm release version (e.g., 7.2.2)
         required: false
-        default: "7.1.1"
+        default: "7.2.2"
       migraphx_repo:
         type: string
         description: MIGraphX repository (defaults to current repo)
@@ -37,9 +37,9 @@ on:
     inputs:
       rocm_release:
         type: string
-        description: ROCm release version (e.g., 7.1.1)
+        description: ROCm release version (e.g., 7.2.2)
         required: true
-        default: "7.1.1"
+        default: "7.2.2"
       migraphx_repo:
         type: string
         description: MIGraphX repository (defaults to current repo)
@@ -54,24 +54,37 @@ on:
         default: "gfx906;gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201"
 
 env:
-  ROCM_VERSION: ${{ inputs.rocm_release || '7.1.1' }}
+  ROCM_VERSION: ${{ inputs.rocm_release || '7.2.2' }}
+  # Used by the RPM/manylinux build to enumerate CPython tags shipped in the image.
   PYTHON_VERSIONS: "cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313 cp314-cp314"
   PRIMARY_PYTHON_VERSION: cp312-cp312
 
 jobs:
   build:
-    name: Build MIGraphX (${{ matrix.pkg_format }})
+    name: Build MIGraphX (${{ matrix.os_tag }})
     runs-on: ubuntu-latest
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        pkg_format: [RPM, DEB]
+        include:
+          - pkg_format: RPM
+            os_tag: rhel8
+            container: quay.io/pypa/manylinux_2_28_x86_64
+          - pkg_format: DEB
+            os_tag: ubuntu-24.04
+            container: ubuntu:24.04
+          - pkg_format: DEB
+            os_tag: ubuntu-22.04
+            container: ubuntu:22.04
     container:
-      image: quay.io/pypa/manylinux_2_28_x86_64
+      image: ${{ matrix.container }}
 
     steps:
-      - name: Install base system dependencies
+      # -------- RPM (manylinux_2_28 / RHEL 8) setup --------
+
+      - name: Install base system dependencies (RPM)
+        if: matrix.pkg_format == 'RPM'
         run: |
           dnf install -y epel-release
           dnf install -y \
@@ -91,11 +104,8 @@ jobs:
             protobuf-compiler \
             doxygen
 
-      - name: Install dpkg for DEB packaging
-        if: matrix.pkg_format == 'DEB'
-        run: dnf install -y dpkg
-
-      - name: Add ROCm repository
+      - name: Add ROCm repository (RPM)
+        if: matrix.pkg_format == 'RPM'
         run: |
           tee /etc/yum.repos.d/rocm.repo <<REPOEOF
           [ROCm]
@@ -117,7 +127,8 @@ jobs:
 
           dnf clean all
 
-      - name: Install ROCm development packages
+      - name: Install ROCm development packages (RPM)
+        if: matrix.pkg_format == 'RPM'
         run: |
           dnf install -y \
             rocm-dev \
@@ -128,7 +139,8 @@ jobs:
             half \
             composablekernel-devel
 
-      - name: Install Python dev packages (3.10 - 3.14)
+      - name: Install Python dev packages (RPM, 3.10 - 3.14)
+        if: matrix.pkg_format == 'RPM'
         run: |
           for pyver in ${{ env.PYTHON_VERSIONS }}; do
             pypath="/opt/python/$pyver"
@@ -143,10 +155,95 @@ jobs:
 
           PRIMARY="/opt/python/${{ env.PRIMARY_PYTHON_VERSION }}"
           echo "PATH=${PRIMARY}/bin:${PATH}" >> "$GITHUB_ENV"
+          echo "PYTHON3_EXECUTABLE=${PRIMARY}/bin/python" >> "$GITHUB_ENV"
           echo "Using primary Python: $("$PRIMARY/bin/python" --version)"
 
+      # -------- DEB (Ubuntu 24.04 noble) setup --------
+      # Follows the official ROCm Ubuntu native install instructions:
+      # https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/install-methods/package-manager/package-manager-ubuntu.html
+
+      - name: Install base system dependencies (DEB)
+        if: matrix.pkg_format == 'DEB'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            wget \
+            gnupg \
+            lsb-release \
+            sudo \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            libnuma-dev \
+            libsqlite3-dev \
+            libssl-dev \
+            libbz2-dev \
+            libffi-dev \
+            zlib1g-dev \
+            libprotobuf-dev \
+            protobuf-compiler \
+            doxygen \
+            python3 \
+            python3-dev \
+            python3-pip \
+            python3-venv \
+            python3-setuptools \
+            python3-wheel
+
+      - name: Register ROCm package signing key (DEB)
+        if: matrix.pkg_format == 'DEB'
+        run: |
+          mkdir --parents --mode=0755 /etc/apt/keyrings
+          wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | \
+            gpg --dearmor | tee /etc/apt/keyrings/rocm.gpg > /dev/null
+
+      - name: Register ROCm apt repository (DEB)
+        if: matrix.pkg_format == 'DEB'
+        run: |
+          UBUNTU_CODENAME=$(. /etc/os-release && echo "$UBUNTU_CODENAME")
+
+          tee /etc/apt/sources.list.d/rocm.list <<EOF
+          deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ env.ROCM_VERSION }} ${UBUNTU_CODENAME} main
+          EOF
+
+          tee /etc/apt/preferences.d/rocm-pin-600 <<EOF
+          Package: *
+          Pin: release o=repo.radeon.com
+          Pin-Priority: 600
+          EOF
+
+          apt-get update
+
+      - name: Install ROCm development packages (DEB)
+        if: matrix.pkg_format == 'DEB'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get install -y --no-install-recommends \
+            rocm-hip-sdk \
+            rocm-cmake \
+            miopen-hip-dev \
+            rocblas-dev \
+            hipblaslt-dev \
+            composablekernel-dev \
+            half
+
+      - name: Install Python build helpers (DEB)
+        if: matrix.pkg_format == 'DEB'
+        run: |
+          python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
+          python3 -m pip install --break-system-packages pybind11[global] numpy
+          echo "PYTHON3_EXECUTABLE=$(command -v python3)" >> "$GITHUB_ENV"
+          echo "Using primary Python: $(python3 --version)"
+
+      # -------- Common steps --------
+
       - name: Install rbuild
-        run: pip install rbuild cget
+        run: python3 -m pip install ${{ matrix.pkg_format == 'DEB' && '--break-system-packages' || '' }} rbuild cget
 
       - name: Checkout MIGraphX
         uses: actions/checkout@v4
@@ -174,7 +271,7 @@ jobs:
             -DMIGRAPHX_ENABLE_PYTHON=ON \
             -DMIGRAPHX_DISABLE_VIRTUAL_ENV=ON \
             -DMIGRAPHX_USE_COMPOSABLEKERNEL=ON \
-            -DPython3_EXECUTABLE="/opt/python/${{ env.PRIMARY_PYTHON_VERSION }}/bin/python"
+            -DPython3_EXECUTABLE="${PYTHON3_EXECUTABLE}"
 
       - name: Build MIGraphX
         working-directory: AMDMIGraphX/build
@@ -186,10 +283,10 @@ jobs:
         working-directory: AMDMIGraphX/build
         run: cpack -G ${{ matrix.pkg_format }} --verbose
 
-      - name: Upload ${{ matrix.pkg_format }} packages
+      - name: Upload ${{ matrix.os_tag }} packages
         uses: actions/upload-artifact@v4
         with:
-          name: migraphx-${{ matrix.pkg_format }}-packages
+          name: migraphx-${{ matrix.os_tag }}-packages
           path: |
             AMDMIGraphX/build/*.rpm
             AMDMIGraphX/build/*.deb
