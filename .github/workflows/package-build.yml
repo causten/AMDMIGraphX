@@ -1,0 +1,196 @@
+name: Build MIGraphX Packages (RPM & DEB)
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+  pull_request:
+    branches:
+      - develop
+      - master
+
+  workflow_call:
+    inputs:
+      rocm_release:
+        type: string
+        description: ROCm release version (e.g., 6.4)
+        required: false
+        default: "7.1.1"
+      migraphx_repo:
+        type: string
+        description: MIGraphX repository (defaults to current repo)
+        required: false
+        default: ""
+      migraphx_branch:
+        type: string
+        description: MIGraphX branch/ref to build (defaults to current ref)
+        required: false
+        default: ""
+      gpu_targets:
+        type: string
+        description: Semicolon-separated GPU architecture targets
+        required: false
+        default: "gfx906;gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201"
+
+  workflow_dispatch:
+    inputs:
+      rocm_release:
+        type: string
+        description: ROCm release version (e.g., 7.1.1)
+        required: true
+        default: "7.1.1"
+      migraphx_repo:
+        type: string
+        description: MIGraphX repository (defaults to current repo)
+        default: ""
+      migraphx_branch:
+        type: string
+        description: MIGraphX branch/ref to build (defaults to current ref)
+        default: ""
+      gpu_targets:
+        type: string
+        description: Semicolon-separated GPU architecture targets
+        default: "gfx906;gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201"
+
+env:
+  ROCM_VERSION: ${{ inputs.rocm_release || '7.1.1' }}
+  PYTHON_VERSIONS: "cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313 cp314-cp314"
+  PRIMARY_PYTHON_VERSION: cp312-cp312
+
+jobs:
+  build:
+    name: Build MIGraphX (${{ matrix.pkg_format }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg_format: [RPM, DEB]
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64
+
+    steps:
+      - name: Install base system dependencies
+        run: |
+          dnf install -y epel-release
+          dnf install -y \
+            cmake \
+            git \
+            wget \
+            which \
+            pkg-config \
+            rpm-build \
+            numactl-devel \
+            sqlite-devel \
+            openssl-devel \
+            bzip2-devel \
+            libffi-devel \
+            zlib-devel \
+            protobuf-devel \
+            protobuf-compiler \
+            doxygen
+
+      - name: Install dpkg for DEB packaging
+        if: matrix.pkg_format == 'DEB'
+        run: dnf install -y dpkg
+
+      - name: Add ROCm repository
+        run: |
+          tee /etc/yum.repos.d/rocm.repo <<REPOEOF
+          [ROCm]
+          name=ROCm
+          baseurl=https://repo.radeon.com/rocm/rhel8/${{ env.ROCM_VERSION }}/main
+          enabled=1
+          gpgcheck=1
+          gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
+          REPOEOF
+
+          tee /etc/yum.repos.d/amdgpu.repo <<REPOEOF
+          [amdgpu]
+          name=amdgpu
+          baseurl=https://repo.radeon.com/amdgpu/${{ env.ROCM_VERSION }}/rhel/8.10/main/x86_64
+          enabled=1
+          gpgcheck=1
+          gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
+          REPOEOF
+
+          dnf clean all
+
+      - name: Install ROCm development packages
+        run: |
+          dnf install -y \
+            rocm-dev \
+            rocm-cmake \
+            miopen-hip-devel \
+            rocblas-devel \
+            hipblaslt-devel \
+            half \
+            composablekernel-devel
+
+      - name: Install Python dev packages (3.10 - 3.14)
+        run: |
+          for pyver in ${{ env.PYTHON_VERSIONS }}; do
+            pypath="/opt/python/$pyver"
+            if [ -d "$pypath" ]; then
+              echo "Found: $("$pypath/bin/python" --version) at $pypath"
+              "$pypath/bin/pip" install --upgrade pip setuptools wheel
+              "$pypath/bin/pip" install pybind11[global] numpy
+            else
+              echo "::warning::Python $pyver not found in manylinux image"
+            fi
+          done
+
+          PRIMARY="/opt/python/${{ env.PRIMARY_PYTHON_VERSION }}"
+          echo "PATH=${PRIMARY}/bin:${PATH}" >> "$GITHUB_ENV"
+          echo "Using primary Python: $("$PRIMARY/bin/python" --version)"
+
+      - name: Install rbuild
+        run: pip install rbuild cget
+
+      - name: Checkout MIGraphX
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.migraphx_repo || github.repository }}
+          ref: ${{ inputs.migraphx_branch || github.ref }}
+          path: AMDMIGraphX
+
+      - name: Prepare MIGraphX dependencies via rbuild
+        working-directory: AMDMIGraphX
+        run: rbuild prepare -d /migraphx-deps
+
+      - name: Configure MIGraphX
+        working-directory: AMDMIGraphX
+        run: |
+          export CXX=/opt/rocm/llvm/bin/clang++
+          export CC=/opt/rocm/llvm/bin/clang
+
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/opt/rocm \
+            -DCMAKE_PREFIX_PATH="/migraphx-deps;/opt/rocm" \
+            -DCMAKE_EXECUTE_PROCESS_COMMAND_ECHO=STDOUT \
+            -DGPU_TARGETS="${{ inputs.gpu_targets || 'gfx906;gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201' }}" \
+            -DMIGRAPHX_ENABLE_PYTHON=ON \
+            -DMIGRAPHX_DISABLE_VIRTUAL_ENV=ON \
+            -DMIGRAPHX_USE_COMPOSABLEKERNEL=ON \
+            -DPython3_EXECUTABLE="/opt/python/${{ env.PRIMARY_PYTHON_VERSION }}/bin/python"
+
+      - name: Build MIGraphX
+        working-directory: AMDMIGraphX/build
+        run: |
+          make -j"$(nproc)" generate
+          make -j"$(nproc)" all
+
+      - name: Generate ${{ matrix.pkg_format }} package
+        working-directory: AMDMIGraphX/build
+        run: cpack -G ${{ matrix.pkg_format }} --verbose
+
+      - name: Upload ${{ matrix.pkg_format }} packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: migraphx-${{ matrix.pkg_format }}-packages
+          path: |
+            AMDMIGraphX/build/*.rpm
+            AMDMIGraphX/build/*.deb
+          if-no-files-found: error
