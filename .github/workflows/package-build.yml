@@ -233,6 +233,7 @@ jobs:
 
       - name: Install Python dev packages (DEB, default OS python through 3.14)
         if: matrix.pkg_format == 'DEB'
+        shell: bash
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
