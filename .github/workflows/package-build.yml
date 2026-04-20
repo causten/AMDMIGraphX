@@ -31,7 +31,7 @@ on:
         type: string
         description: Semicolon-separated GPU architecture targets
         required: false
-        default: "gfx906;gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201"
+        default: "gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201"
 
   workflow_dispatch:
     inputs:
@@ -51,7 +51,7 @@ on:
       gpu_targets:
         type: string
         description: Semicolon-separated GPU architecture targets
-        default: "gfx906;gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201"
+        default: "gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201"
 
 env:
   ROCM_VERSION: ${{ inputs.rocm_release || '7.2.2' }}
@@ -308,7 +308,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=/opt/rocm \
             -DCMAKE_PREFIX_PATH="/migraphx-deps;/opt/rocm" \
             -DCMAKE_EXECUTE_PROCESS_COMMAND_ECHO=STDOUT \
-            -DGPU_TARGETS="${{ inputs.gpu_targets || 'gfx906;gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201' }}" \
+            -DGPU_TARGETS="${{ inputs.gpu_targets || 'gfx908;gfx90a;gfx1030;gfx1100;gfx1101;gfx1201' }}" \
             -DMIGRAPHX_ENABLE_PYTHON=ON \
             -DMIGRAPHX_DISABLE_VIRTUAL_ENV=ON \
             -DMIGRAPHX_USE_COMPOSABLEKERNEL=ON \
