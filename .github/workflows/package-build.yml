@@ -105,7 +105,8 @@ jobs:
             zlib-devel \
             protobuf-devel \
             protobuf-compiler \
-            doxygen
+            doxygen \
+            python3.12-devel
 
       - name: Add ROCm repository (RPM)
         if: matrix.pkg_format == 'RPM'
